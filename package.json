@@ -1,0 +1,30 @@
+{
+  "name": "koishi-plugin-ll-ziyong",
+  "version": "1.0.0",
+  "description": "AI 生图插件：接入 OpenAI 通用模型（Gemini 等），支持积分系统，可生成动漫化/手办化图片",
+  "main": "lib/index.js",
+  "typings": "lib/index.d.ts",
+  "files": ["lib"],
+  "scripts": {
+    "build": "tsc",
+    "clean": "rimraf lib"
+  },
+  "license": "MIT",
+  "keywords": ["koishi", "koishi-plugin", "image-generation", "ai", "gemini"],
+  "koishi": {
+    "description": {
+      "zh": "AI 生图插件：接入 OpenAI 通用模型（Gemini 等），可设置关键词触发，含积分系统（仅管理员可添加积分）"
+    },
+    "service": {
+      "required": ["database"]
+    }
+  },
+  "peerDependencies": {
+    "koishi": "^4.18.0"
+  },
+  "devDependencies": {
+    "koishi": "^4.18.0",
+    "typescript": "^5.4.0",
+    "rimraf": "^5.0.0"
+  }
+}
