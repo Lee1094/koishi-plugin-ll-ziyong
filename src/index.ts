@@ -145,7 +145,7 @@ export function apply(ctx: Context, config: Config) {
         const src = imgs[0]?.attrs?.src as string | undefined
         if (src) {
           const buf = await downloadImage(src)
-          if (buf) { logger.info('提取参考图: 回复消息 (elements)'); return { buffer: buf, source: 'reply' } }
+          if (buf) { logger.info('提取参考图: 回复消息 (elements)'); return { buffer: buf, source: '回复图片' } }
         }
       }
       // 1b) 从原始 content 文本解析图片链接
@@ -154,7 +154,7 @@ export function apply(ctx: Context, config: Config) {
         const imgUrl = pickImgUrlFromText(qContent)
         if (imgUrl) {
           const buf = await downloadImage(imgUrl)
-          if (buf) { logger.info('提取参考图: 回复消息 (content)'); return { buffer: buf, source: 'reply' } }
+          if (buf) { logger.info('提取参考图: 回复消息 (content)'); return { buffer: buf, source: '回复图片' } }
         }
       }
     }
@@ -166,7 +166,7 @@ export function apply(ctx: Context, config: Config) {
       const src = imgs[0]?.attrs?.src as string | undefined
       if (src) {
         const buf = await downloadImage(src)
-        if (buf) { logger.info('提取参考图: 附件'); return { buffer: buf, source: 'attachment' } }
+        if (buf) { logger.info('提取参考图: 附件'); return { buffer: buf, source: '发送图片' } }
       }
     }
     // 2b) 从原始 content 文本解析（发图时可能有 URL）
@@ -175,7 +175,7 @@ export function apply(ctx: Context, config: Config) {
       const imgUrl = pickImgUrlFromText(rawContent)
       if (imgUrl) {
         const buf = await downloadImage(imgUrl)
-        if (buf) { logger.info('提取参考图: 文本中的URL'); return { buffer: buf, source: 'attachment' } }
+        if (buf) { logger.info('提取参考图: 文本中的URL'); return { buffer: buf, source: '发送图片' } }
       }
     }
 
@@ -260,8 +260,9 @@ export function apply(ctx: Context, config: Config) {
           ]
         : `${config.prompt}\n${prompt}`
 
-      const res = await ctx.http.post<{ choices?: Array<{ message?: { content?: string } }> }>(
-        `${config.apiUrl}/chat/completions`,
+      const base = config.apiUrl.replace(/\/+$/, '') // 去末尾斜杠
+      const apiUrl = /^https?:\/\//i.test(base) ? `${base}/chat/completions` : `https://${base}/chat/completions`
+      const res = await ctx.http.post<{ choices?: Array<{ message?: { content?: string } }> }>(apiUrl,
         {
           model: config.model,
           messages: [{ role: 'user', content: userContent }],
