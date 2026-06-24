@@ -298,8 +298,6 @@ export function apply(ctx: Context, config: Config) {
   /* ── 生图执行流程（命令 & 关键词共用） ── */
   async function doGenerate(session: Session, prompt: string, refImg?: { buffer: Buffer; source: string }) {
     const uid = uidOf(session)
-    const s = session as any
-    const name = s.user?.name || s.author?.name || uid
 
     const now = Date.now()
     const last = cooldowns.get(uid) || 0
@@ -312,8 +310,8 @@ export function apply(ctx: Context, config: Config) {
     cooldowns.set(uid, now)
 
     const tip = refImg
-      ? `🎨 ${name} 正在「${refImg.source}」→ 手办化...（-${config.cost} 积分）`
-      : `🎨 ${name} 正在生图「${prompt.slice(0, 40)}」...（-${config.cost} 积分）`
+      ? `🎨 正在「${refImg.source}」→ 手办化...（-${config.cost} 积分）`
+      : `🎨 正在生图「${prompt.slice(0, 40)}」...（-${config.cost} 积分）`
     await session.send(tip)
 
     const buf = await generateImage(prompt, refImg?.buffer)
@@ -401,11 +399,9 @@ export function apply(ctx: Context, config: Config) {
       }
       cooldowns.set(uid, now)
 
-      const s = session as any
-      const name = s.user?.name || s.author?.name || uid
       const tip = refImg
-        ? `🎨 ${name} 正在「${refImg.source}」→ 手办化...（-${config.cost} 积分）`
-        : `🎨 ${name} 正在生图「${prompt.slice(0, 40)}」...（-${config.cost} 积分）`
+        ? `🎨 正在「${refImg.source}」→ 手办化...（-${config.cost} 积分）`
+        : `🎨 正在生图「${prompt.slice(0, 40)}」...（-${config.cost} 积分）`
       await session.send(tip)
 
       const buf = await generateImage(prompt, refImg?.buffer)
