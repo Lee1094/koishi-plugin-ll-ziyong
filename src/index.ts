@@ -341,7 +341,8 @@ export function apply(ctx: Context, config: Config) {
       if (session.user?.authority < 3) return '❌ 仅管理员可用'
       const n = Number(amount)
       logger.info(`[加积分] target="${target}" amount="${amount}" n=${n}`)
-      if (!target || !amount || isNaN(n) || n <= 0 || n > 100000) return '积分范围 1~100000'
+      if (!target) return `用法：/${config.commandName}.add <用户ID或@某人> <积分数量>`
+      if (!amount || isNaN(Number(amount)) || Number(amount) <= 0 || Number(amount) > 100000) return '积分范围 1~100000，如 /shengtu.add @小明 100'
 
       let uid = target
       if (uid.startsWith('<@') && uid.endsWith('>')) uid = uid.slice(2, -1)
