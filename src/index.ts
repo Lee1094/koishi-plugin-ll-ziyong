@@ -199,24 +199,42 @@ export function apply(ctx: Context, config: Config) {
     return null
   }
 
-  /* ── 获取纯文本（去 @mention、去回复前缀） ── */
-  function cleanText(session: Session): string {
+  /* ── 从 elements 里提取纯文本 ── */
+  function extractText(session: Session): string {
+    // 方法1: 直接从 elements 找 text 类型元素（最可靠）
+    const els = session.elements || (session as any)['_elements']
+    if (els?.length) {
+      const parts: string[] = []
+      for (const el of els) {
+        if (el.type === 'text') {
+          parts.push(el.attrs?.text || el.attrs?.content || el.attrs?.['text'] || '')
+        } else if (el.type === 'at') {
+          // 跳过 @mention
+        } else {
+          // img、face、quote 等非文本元素跳过
+        }
+      }
+      const joined = parts.join('').trim()
+      if (joined) return joined
+    }
+    // 方法2: fallback 到 session.content 并剥离 XML 标签
     let text = session.content || ''
     if (typeof text !== 'string') return ''
+    // 去掉 XML 元素标签，只留文字
+    text = text.replace(/<[^>]+>/g, '').trim()
+    return text
+  }
+
+  /* ── 获取纯文本（去 @mention、去回复前缀、跳过命令） ── */
+  function cleanText(session: Session): string {
+    let text = extractText(session)
+    if (!text) return ''
     // 跳过命令前缀
-    if (/^[\/!！#]/.test(text.trim())) return ''
-    // 去 @mention 文本
-    const els = session.elements || (session as any)['_elements']
-    if (els) {
-      for (const at of h.select(els, 'at')) {
-        const name = (at.attrs?.name as string) || (at.attrs?.id as string) || ''
-        if (name) text = text.replace(`@${name}`, '').trim()
-      }
-    }
-    // 去掉常见的回复前缀格式（如 QQ 的「回复 xxx:」等），只保留真正输入的文字
+    if (/^[\/!！#]/.test(text)) return ''
+    // 去掉常见的回复前缀格式
     text = text.replace(/^\[回复[^\]]*\]/g, '').trim()
     text = text.replace(/^「[^」]*」\s*/g, '').trim()
-    return text.trim()
+    return text
   }
 
   /* ── 检查是否命中关键词 ── */
@@ -321,15 +339,17 @@ export function apply(ctx: Context, config: Config) {
     .userFields(['id', 'authority'])
     .action(async ({ session }, target, amount) => {
       if (session.user?.authority < 3) return '❌ 仅管理员可用'
-      if (!amount || amount <= 0 || amount > 100000) return '积分范围 1~100000'
+      const n = Number(amount)
+      logger.info(`[加积分] target="${target}" amount="${amount}" n=${n}`)
+      if (!target || !amount || isNaN(n) || n <= 0 || n > 100000) return '积分范围 1~100000'
 
       let uid = target
       if (uid.startsWith('<@') && uid.endsWith('>')) uid = uid.slice(2, -1)
       else if (uid.startsWith('@')) uid = uid.slice(1)
 
       const adminId = uidOf(session)
-      const cur = await addPoints(uid, amount, adminId)
-      return `✅ 已为 ${target} 添加 ${amount} 积分 → 余额 ${cur}`
+      const cur = await addPoints(uid, n, adminId)
+      return `✅ 已为 ${target} 添加 ${n} 积分 → 余额 ${cur}`
     })
 
   /* ── 主命令：生图（支持回复图片 / 发图 + 命令） ── */
