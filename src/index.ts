@@ -398,7 +398,9 @@ export function apply(ctx: Context, config: Config) {
       if (!prompt) prompt = refImg ? '手办化' : text
 
       if (!(await spendPoints(uid, config.cost))) {
-        await session.send(`❌ 积分不足！需 ${config.cost}，你当前 ${await getPoints(uid)} 积分`)
+        const pts = await getPoints(uid)
+        logger.info(`[积分不足] uid="${(session as any).user?.id}" → 规范="${uid}" 积分=${pts}`)
+        await session.send(`❌ 积分不足！需 ${config.cost}，你当前 ${pts} 积分 [UID:${uid}]`)
         return next()
       }
       cooldowns.set(uid, now)
