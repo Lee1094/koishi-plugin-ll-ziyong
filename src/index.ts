@@ -114,31 +114,71 @@ export function apply(ctx: Context, config: Config) {
     }
   }
 
+  /* ── 从文本中提取图片 URL ── */
+  function pickImgUrlFromText(text: string): string | null {
+    // base64 data URL
+    const b64 = text.match(/data:image\/[^;]+;base64,([A-Za-z0-9+/=]+)/)
+    if (b64) return b64[0]
+    // markdown image
+    const md = text.match(/!\[.*?\]\((https?:\/\/[^\s)]+)\)/)
+    if (md) return md[1]
+    // plain URL
+    const url = text.match(/(https?:\/\/[^\s"'\]]+\.(?:png|jpg|jpeg|gif|webp))/i)
+    if (url) return url[1]
+    // CQ 码
+    const cq = text.match(/\[CQ:image,file=([^,\]]+)/)
+    if (cq) return cq[1]
+    return null
+  }
+
   /* ── 从 Session 提取参考图片（回复 / 附件 / @头像） ── */
   async function extractRefImage(session: Session): Promise<{ buffer: Buffer; source: string } | null> {
-    // 1) 回复消息中的图片
-    if (session.quote?.elements) {
-      const imgs = h.select(session.quote.elements, 'img')
-      const src = imgs[0]?.attrs?.src as string | undefined
-      if (src) {
-        const buf = await downloadImage(src)
-        if (buf) return { buffer: buf, source: 'reply' }
+    // 1) 回复消息中的图片 — 优先从 elements，fallback 到 content 文本解析
+    if (session.quote) {
+      // 1a) 已解析的 elements
+      const qElements = session.quote.elements || session.quote['message']?.elements
+      if (qElements) {
+        const imgs = h.select(qElements, 'img')
+        const src = imgs[0]?.attrs?.src as string | undefined
+        if (src) {
+          const buf = await downloadImage(src)
+          if (buf) { logger.info('提取参考图: 回复消息 (elements)'); return { buffer: buf, source: 'reply' } }
+        }
+      }
+      // 1b) 从原始 content 文本解析图片链接
+      const qContent = session.quote.content || session.quote['message']?.content || ''
+      if (typeof qContent === 'string') {
+        const imgUrl = pickImgUrlFromText(qContent)
+        if (imgUrl) {
+          const buf = await downloadImage(imgUrl)
+          if (buf) { logger.info('提取参考图: 回复消息 (content)'); return { buffer: buf, source: 'reply' } }
+        }
       }
     }
 
     // 2) 当前消息中的图片
-    if (session.elements) {
-      const imgs = h.select(session.elements, 'img')
+    const els = session.elements || (session as any)['_elements']
+    if (els) {
+      const imgs = h.select(els, 'img')
       const src = imgs[0]?.attrs?.src as string | undefined
       if (src) {
         const buf = await downloadImage(src)
-        if (buf) return { buffer: buf, source: 'attachment' }
+        if (buf) { logger.info('提取参考图: 附件'); return { buffer: buf, source: 'attachment' } }
+      }
+    }
+    // 2b) 从原始 content 文本解析（发图时可能有 URL）
+    const rawContent = session.content || ''
+    if (typeof rawContent === 'string') {
+      const imgUrl = pickImgUrlFromText(rawContent)
+      if (imgUrl) {
+        const buf = await downloadImage(imgUrl)
+        if (buf) { logger.info('提取参考图: 文本中的URL'); return { buffer: buf, source: 'attachment' } }
       }
     }
 
     // 3) @某人的头像
-    if (session.elements) {
-      const ats = h.select(session.elements, 'at')
+    if (els) {
+      const ats = h.select(els, 'at')
       const atId = ats[0]?.attrs?.id as string | undefined
       if (atId) {
         try {
@@ -146,7 +186,7 @@ export function apply(ctx: Context, config: Config) {
           const avatarUrl = user?.avatar
           if (avatarUrl) {
             const buf = await downloadImage(avatarUrl)
-            if (buf) return { buffer: buf, source: `@${user.name || atId}` }
+            if (buf) { logger.info('提取参考图: @头像'); return { buffer: buf, source: `@${user.name || atId}` } }
           }
         } catch (e) {
           logger.debug('获取用户头像失败:', atId, e)
@@ -157,19 +197,23 @@ export function apply(ctx: Context, config: Config) {
     return null
   }
 
-  /* ── 获取纯文本（去 @mention） ── */
+  /* ── 获取纯文本（去 @mention、去回复前缀） ── */
   function cleanText(session: Session): string {
     let text = session.content || ''
     if (typeof text !== 'string') return ''
     // 跳过命令前缀
     if (/^[\/!！#]/.test(text.trim())) return ''
     // 去 @mention 文本
-    if (session.elements) {
-      for (const at of h.select(session.elements, 'at')) {
+    const els = session.elements || (session as any)['_elements']
+    if (els) {
+      for (const at of h.select(els, 'at')) {
         const name = (at.attrs?.name as string) || (at.attrs?.id as string) || ''
-        text = text.replace(`@${name}`, '').trim()
+        if (name) text = text.replace(`@${name}`, '').trim()
       }
     }
+    // 去掉常见的回复前缀格式（如 QQ 的「回复 xxx:」等），只保留真正输入的文字
+    text = text.replace(/^\[回复[^\]]*\]/g, '').trim()
+    text = text.replace(/^「[^」]*」\s*/g, '').trim()
     return text.trim()
   }
 
@@ -287,7 +331,7 @@ export function apply(ctx: Context, config: Config) {
     })
 
   /* ── 主命令：生图（支持回复图片 / 发图 + 命令） ── */
-  ctx.command(`${config.commandName} [prompt:text]`, 'AI 生图（消耗积分），可回复图片或发图 + 命令')
+  const cmd = ctx.command(`${config.commandName} [prompt:text]`, 'AI 生图（消耗积分），可回复图片或发图 + 命令')
     .userFields(['id', 'name'])
     .action(async ({ session }, prompt) => {
       const refImg = await extractRefImage(session)
@@ -301,11 +345,19 @@ export function apply(ctx: Context, config: Config) {
       return doGenerate(session, text, refImg || undefined)
     })
 
+  // 添加关键词别名，如 /手办化 直接触发
+  for (const kw of config.keywords) {
+    cmd.alias(kw)
+  }
+
   /* ── 关键词触发（支持回复图片 / 发图 / @头像） ── */
   if (config.keywords?.length) {
     ctx.middleware(async (session, next) => {
       const text = cleanText(session)
-      if (!matchKeyword(text)) return next()
+      const kw = matchKeyword(text)
+      // 调试：看看到底收到了什么
+      if (text) logger.info(`[关键词] 原文="${session.content?.slice(0,60)}" → 清洗="${text}" → 命中="${kw || '无'}"`)
+      if (!kw) return next()
 
       const uid = uidOf(session)
 
@@ -318,7 +370,7 @@ export function apply(ctx: Context, config: Config) {
 
       // 构造 prompt：去除关键词
       let prompt = text
-      for (const kw of config.keywords) prompt = prompt.replace(kw, '').trim()
+      for (const k of config.keywords) prompt = prompt.replace(k, '').trim()
       if (!prompt) prompt = refImg ? '手办化' : text
 
       if (!(await spendPoints(uid, config.cost))) {
