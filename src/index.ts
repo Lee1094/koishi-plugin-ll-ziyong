@@ -335,7 +335,7 @@ export function apply(ctx: Context, config: Config) {
     })
 
   /* ── 管理员加积分 ── */
-  ctx.command(`${config.commandName}.add <target:text> <amount:number>`, '给用户加积分（仅管理）')
+  ctx.command(`${config.commandName}.add <target> <amount:number>`, '给用户加积分（仅管理）')
     .userFields(['id', 'authority'])
     .action(async ({ session }, target, amount) => {
       if (session.user?.authority < 3) return '❌ 仅管理员可用'
