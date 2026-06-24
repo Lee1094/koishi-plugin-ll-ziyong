@@ -67,6 +67,8 @@ export function apply(ctx: Context, config: Config) {
     userId: 'string',
     points: 'unsigned',
     totalSpent: 'unsigned',
+  }, {
+    primary: 'userId',
   })
 
   const cooldowns = new Map<string, number>()
