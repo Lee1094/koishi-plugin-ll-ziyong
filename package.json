@@ -1,6 +1,6 @@
 {
   "name": "koishi-plugin-ll-ziyong",
-  "version": "1.0.8",
+  "version": "1.0.9",
   "description": "AI 生图插件：接入 OpenAI 通用模型（Gemini 等），支持积分系统，可生成动漫化/手办化图片",
   "main": "lib/index.js",
   "typings": "lib/index.d.ts",

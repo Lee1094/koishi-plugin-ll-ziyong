@@ -340,7 +340,6 @@ export function apply(ctx: Context, config: Config) {
     .action(async ({ session }, target, amount) => {
       if (session.user?.authority < 3) return '❌ 仅管理员可用'
       const n = Number(amount)
-      logger.info(`[加积分] target="${target}" amount="${amount}" n=${n}`)
       if (!target) return `用法：/${config.commandName}.add <用户ID或@某人> <积分数量>`
       if (!amount || isNaN(Number(amount)) || Number(amount) <= 0 || Number(amount) > 100000) return '积分范围 1~100000，如 /shengtu.add @小明 100'
 
@@ -378,8 +377,6 @@ export function apply(ctx: Context, config: Config) {
     ctx.middleware(async (session, next) => {
       const text = cleanText(session)
       const kw = matchKeyword(text)
-      // 调试：看看到底收到了什么
-      if (text) logger.info(`[关键词] 原文="${session.content?.slice(0,60)}" → 清洗="${text}" → 命中="${kw || '无'}"`)
       if (!kw) return next()
 
       const uid = uidOf(session)
