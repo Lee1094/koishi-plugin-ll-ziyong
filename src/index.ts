@@ -102,9 +102,8 @@ export function apply(ctx: Context, config: Config) {
   }
 
   function uidOf(session: any): string {
-    const raw = String(session.user?.id ?? session.author?.id ?? 'unknown')
-    // 去掉平台前缀，如 "onebot:12345" → "12345"
-    return raw.includes(':') ? raw.split(':').slice(1).join(':') : raw
+    // session.userId 是平台原生 ID（如 QQ 号），不带 onebot: 前缀
+    return String(session.userId ?? session.event?.user?.id ?? session.user?.id ?? session.author?.id ?? 'unknown')
   }
 
   /* ── 下载图片 ── */
@@ -348,8 +347,6 @@ export function apply(ctx: Context, config: Config) {
       let uid = target
       if (uid.startsWith('<@') && uid.endsWith('>')) uid = uid.slice(2, -1)
       else if (uid.startsWith('@')) uid = uid.slice(1)
-      // 去掉平台前缀
-      if (uid.includes(':')) uid = uid.split(':').slice(1).join(':')
 
       const adminId = uidOf(session)
       const cur = await addPoints(uid, n, adminId)
@@ -398,9 +395,7 @@ export function apply(ctx: Context, config: Config) {
       if (!prompt) prompt = refImg ? '手办化' : text
 
       if (!(await spendPoints(uid, config.cost))) {
-        const pts = await getPoints(uid)
-        logger.info(`[积分不足] uid="${(session as any).user?.id}" → 规范="${uid}" 积分=${pts}`)
-        await session.send(`❌ 积分不足！需 ${config.cost}，你当前 ${pts} 积分 [UID:${uid}]`)
+        await session.send(`❌ 积分不足！需 ${config.cost}，你当前 ${await getPoints(uid)} 积分`)
         return next()
       }
       cooldowns.set(uid, now)
