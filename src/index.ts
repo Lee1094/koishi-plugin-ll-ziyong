@@ -102,7 +102,9 @@ export function apply(ctx: Context, config: Config) {
   }
 
   function uidOf(session: any): string {
-    return String(session.user?.id ?? session.author?.id ?? 'unknown')
+    const raw = String(session.user?.id ?? session.author?.id ?? 'unknown')
+    // 去掉平台前缀，如 "onebot:12345" → "12345"
+    return raw.includes(':') ? raw.split(':').slice(1).join(':') : raw
   }
 
   /* ── 下载图片 ── */
@@ -346,6 +348,8 @@ export function apply(ctx: Context, config: Config) {
       let uid = target
       if (uid.startsWith('<@') && uid.endsWith('>')) uid = uid.slice(2, -1)
       else if (uid.startsWith('@')) uid = uid.slice(1)
+      // 去掉平台前缀
+      if (uid.includes(':')) uid = uid.split(':').slice(1).join(':')
 
       const adminId = uidOf(session)
       const cur = await addPoints(uid, n, adminId)
